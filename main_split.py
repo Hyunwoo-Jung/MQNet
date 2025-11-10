@@ -2,6 +2,7 @@
 import os
 import time
 import random
+import sys
 
 # Torch
 import torch
@@ -20,22 +21,27 @@ import nets
 
 import methods as methods
 
+sys.stdout.reconfigure(line_buffering=True)
+
 # Seed
-random.seed(0)
-torch.manual_seed(0)
+random.seed(115)
+torch.manual_seed(115)
 torch.backends.cudnn.deterministic = True
 
 # Main
 if __name__ == '__main__':
     # Training settings
+    print("[MAIN] enter main", flush=True)
     args = parser.parse_args()
     args = get_more_args(args)
-    print("args: ", args)
+    print("[MAIN] parsed args:", args, flush=True)
+    # print("args: ", args)
 
     # Runs on Different Class-splits
     for trial in range(args.trial):
         print("=============================Trial: {}=============================".format(trial + 1))
         train_dst, unlabeled_dst, test_dst = get_dataset(args, trial)
+        print("[MAIN] after get_dataset", flush=True)
 
         # Initialize a labeled dataset by randomly sampling K=1,000 points from the entire dataset.
         I_index, O_index, U_index, Q_index = [], [], [], []
@@ -43,17 +49,18 @@ if __name__ == '__main__':
         test_I_index = get_sub_test_dataset(args, test_dst)
 
         # DataLoaders
-        if args.dataset in ['CIFAR10', 'CIFAR100']:
+        if args.dataset in ['CIFAR10', 'CIFAR100', 'SVHN']:
             sampler_labeled = SubsetRandomSampler(I_index)  # make indices initial to the samples
             sampler_test = SubsetSequentialSampler(test_I_index)
-            train_loader = DataLoader(train_dst, sampler=sampler_labeled, batch_size=args.batch_size, num_workers=args.workers)
-            test_loader = DataLoader(test_dst, sampler=sampler_test, batch_size=args.test_batch_size, num_workers=args.workers)
+            train_loader = DataLoader(train_dst, sampler=sampler_labeled, batch_size=args.batch_size, num_workers=args.workers, pin_memory=True, persistent_workers=True)
+            test_loader = DataLoader(test_dst, sampler=sampler_test, batch_size=args.test_batch_size, num_workers=args.workers, pin_memory=True, persistent_workers=True)
         elif args.dataset == 'ImageNet50': # DataLoaderX for efficiency
             dst_subset = torch.utils.data.Subset(train_dst, I_index)
             dst_test = torch.utils.data.Subset(test_dst, test_I_index)
             train_loader = DataLoaderX(dst_subset, batch_size=args.batch_size, shuffle=True, num_workers=args.workers, pin_memory=False)
             test_loader = DataLoaderX(dst_test, batch_size=args.test_batch_size, shuffle=False, num_workers=args.workers, pin_memory=False)
         dataloaders = {'train': train_loader, 'test': test_loader}
+        print("[MAIN] built dataloaders", flush=True)
 
         # Active learning
         logs = []
@@ -68,16 +75,20 @@ if __name__ == '__main__':
             # Loss, criterion and scheduler (re)initialization
             criterion, optimizers, schedulers = get_optim_configurations(args, models)
 
+            print("[MAIN] before self_sup_train", flush=True)
             # Self-supervised Training (for CCAL and MQ-Net with CSI)
             if cycle == 0:
                 models = self_sup_train(args, trial, models, optimizers, schedulers, train_dst, I_index, O_index, U_index)
 
             # Training
+            print("[MAIN] before train()", flush=True)
             t = time.time()
             train(args, models, criterion, optimizers, schedulers, dataloaders)
             print("cycle: {}, elapsed time: {}".format(cycle, (time.time() - t)))
+            print("[MAIN] after train()", flush=True)
 
             # Test
+            print("[MAIN] before test()", flush=True)
             acc = test(args, models, dataloaders)
 
             print('Trial {}/{} || Cycle {}/{} || Labeled IN size {}: Test acc {}'.format(
@@ -90,9 +101,10 @@ if __name__ == '__main__':
                                   selection_method=args.uncertainty,
                                   dataloaders=dataloaders,
                                   cur_cycle=cycle)
-
+            print("[MAIN] before AL select()", flush=True)
             ALmethod = methods.__dict__[args.method](args, models, unlabeled_dst, U_index, **selection_args)
             Q_index, Q_scores = ALmethod.select()
+            print("[MAIN] after AL select()", flush=True)
 
             # Update Indices
             I_index, O_index, U_index, in_cnt = get_sub_train_dataset(args, train_dst, I_index, O_index, U_index, Q_index, initial=False)
@@ -102,17 +114,17 @@ if __name__ == '__main__':
             # Meta-training MQNet
             if args.method == 'MQNet':
                 models, optimizers, schedulers = init_mqnet(args, nets, models, optimizers, schedulers)
-                unlabeled_loader = DataLoader(unlabeled_dst, sampler=SubsetRandomSampler(U_index), batch_size=args.test_batch_size, num_workers=args.workers)
-                delta_loader = DataLoader(train_dst, sampler=SubsetRandomSampler(Q_index), batch_size=max(1, args.csi_batch_size), num_workers=args.workers)
+                unlabeled_loader = DataLoader(unlabeled_dst, sampler=SubsetRandomSampler(U_index), batch_size=args.test_batch_size, num_workers=0, pin_memory=False, persistent_workers=False)
+                delta_loader = DataLoader(train_dst, sampler=SubsetRandomSampler(Q_index), batch_size=max(1, args.csi_batch_size), num_workers=0, pin_memory=False, persistent_workers=False)
                 models = meta_train(args, models, optimizers, schedulers, criterion, dataloaders['train'], unlabeled_loader, delta_loader)
 
             # Update trainloader
-            if args.dataset in ['CIFAR10', 'CIFAR100']:
+            if args.dataset in ['CIFAR10', 'CIFAR100', 'SVHN']:
                 sampler_labeled = SubsetRandomSampler(I_index)  # make indices initial to the samples
-                dataloaders['train'] = DataLoader(train_dst, sampler=sampler_labeled, batch_size=args.batch_size, num_workers=args.workers)
+                dataloaders['train'] = DataLoader(train_dst, sampler=sampler_labeled, batch_size=args.batch_size, num_workers=0, pin_memory=False, persistent_workers=False)
             elif args.dataset == 'ImageNet50':
                 dst_subset = torch.utils.data.Subset(train_dst, I_index)
-                train_loader = DataLoaderX(dst_subset, batch_size=args.batch_size, shuffle=True, num_workers=args.workers, pin_memory=False)
+                train_loader = DataLoaderX(dst_subset, batch_size=args.batch_size, shuffle=True, num_workers=0, pin_memory=False, persistent_workers=False)
 
             # save logs
             logs.append([acc, in_cnt])
@@ -121,7 +133,11 @@ if __name__ == '__main__':
         logs = np.array(logs).reshape((-1, 2))
         print(logs, flush=True)
 
-        file_name = 'logs/'+str(args.dataset)+'/r'+str(args.ood_rate)+'_t'+str(trial)+'_'+str(args.method)
+        file_dir = os.path.join('results', str(args.dataset))
+        os.makedirs(file_dir, exist_ok=True)
+        file_name = os.path.join(file_dir, f"r{args.ood_rate}_e{args.epochs}_t{trial+1}_{args.method}"
+                                 )
         if args.method == 'MQNet':
-            file_name = file_name+'_'+str(args.mqnet_mode)+'_v3_b64'
+            file_name += f"_{args.mqnet_mode}"
+        
         np.savetxt(file_name, logs, fmt='%.4f', delimiter=',')

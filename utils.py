@@ -69,30 +69,49 @@ class GradualWarmupScheduler(_LRScheduler):
             return [base_lr * ((self.multiplier - 1.) * self.last_epoch / self.total_epoch + 1.) for base_lr in self.base_lrs]
 
     def step_ReduceLROnPlateau(self, metrics, epoch=None):
-        if epoch is None:
-            epoch = self.last_epoch + 1
-        self.last_epoch = epoch if epoch != 0 else 1  # ReduceLROnPlateau is called at the end of epoch, whereas others are called at beginning
+        self.last_epoch = self.last_epoch + 1
         if self.last_epoch <= self.total_epoch:
-            warmup_lr = [base_lr * ((self.multiplier - 1.) * self.last_epoch / self.total_epoch + 1.) for base_lr in self.base_lrs]
+            warmup_lr = [base_lr * ((self.multiplier - 1.) * self.last_epoch / self.total_epoch + 1.)
+                        for base_lr in self.base_lrs]
             for param_group, lr in zip(self.optimizer.param_groups, warmup_lr):
                 param_group['lr'] = lr
         else:
-            if epoch is None:
-                self.after_scheduler.step(metrics, None)
-            else:
-                self.after_scheduler.step(metrics, epoch - self.total_epoch)
-
+            self.after_scheduler.step(metrics)
+    
+    # def step_ReduceLROnPlateau(self, metrics, epoch=None):
+    #     if epoch is None:
+    #         epoch = self.last_epoch + 1
+    #     self.last_epoch = epoch if epoch != 0 else 1  # ReduceLROnPlateau is called at the end of epoch, whereas others are called at beginning
+    #     if self.last_epoch <= self.total_epoch:
+    #         warmup_lr = [base_lr * ((self.multiplier - 1.) * self.last_epoch / self.total_epoch + 1.) for base_lr in self.base_lrs]
+    #         for param_group, lr in zip(self.optimizer.param_groups, warmup_lr):
+    #             param_group['lr'] = lr
+    #     else:
+    #         if epoch is None:
+    #             self.after_scheduler.step(metrics, None)
+    #         else:
+    #             self.after_scheduler.step(metrics, epoch - self.total_epoch)
+    
     def step(self, epoch=None, metrics=None):
         if type(self.after_scheduler) != ReduceLROnPlateau:
             if self.finished and self.after_scheduler:
-                if epoch is None:
-                    self.after_scheduler.step(None)
-                else:
-                    self.after_scheduler.step(epoch - self.total_epoch)
+                self.after_scheduler.step()  
             else:
                 return super(GradualWarmupScheduler, self).step(epoch)
         else:
-            self.step_ReduceLROnPlateau(metrics, epoch)
+            self.step_ReduceLROnPlateau(metrics)
+
+    # def step(self, epoch=None, metrics=None):
+    #     if type(self.after_scheduler) != ReduceLROnPlateau:
+    #         if self.finished and self.after_scheduler:
+    #             if epoch is None:
+    #                 self.after_scheduler.step(None)
+    #             else:
+    #                 self.after_scheduler.step(epoch - self.total_epoch)
+    #         else:
+    #             return super(GradualWarmupScheduler, self).step(epoch)
+    #     else:
+    #         self.step_ReduceLROnPlateau(metrics, epoch)
 
 def LossPredLoss(input, target, margin=1.0, reduction='mean'):
     assert input.shape == input.flip(0).shape
@@ -162,7 +181,9 @@ def self_sup_train(args, trial, models, optimizers, schedulers, train_dst, I_ind
             models['semantic'].load_state_dict(torch.load(semantic_path))
             models['distinctive'].load_state_dict(torch.load(distinctive_path))
         else:
-            contrastive_loader = torch.utils.data.DataLoader(dataset=multi_datasets, batch_size=args.ccal_batch_size, shuffle=True)
+            contrastive_loader = torch.utils.data.DataLoader(dataset=multi_datasets, batch_size=args.ccal_batch_size, shuffle=True, 
+                                                             num_workers=0, pin_memory=False, persistent_workers=False)
+            # simclr_aug = get_simclr_augmentation(args, image_size=(32, 32, 3))
             simclr_aug = get_simclr_augmentation(args, image_size=(32, 32, 3)).to(args.device)  # for CIFAR10, 100
 
             # Training the Semantic Coder
@@ -212,7 +233,9 @@ def self_sup_train(args, trial, models, optimizers, schedulers, train_dst, I_ind
             print('Load pre-trained CSI model, named: {}'.format(model_path))
             models['csi'].load_state_dict(torch.load(model_path))
         else:
-            contrastive_loader = torch.utils.data.DataLoader(dataset=multi_datasets, batch_size=args.csi_batch_size, shuffle=True)
+            contrastive_loader = torch.utils.data.DataLoader(dataset=multi_datasets, batch_size=args.csi_batch_size, shuffle=True, 
+                                                             num_workers=0, pin_memory=False, persistent_workers=False)
+            # simclr_aug = get_simclr_augmentation(args, image_size=(32, 32, 3))
             simclr_aug = get_simclr_augmentation(args, image_size=(32, 32, 3)).to(args.device)  # for CIFAR10, 100
 
             # Training CSI
@@ -462,6 +485,11 @@ def get_more_args(args):
         args.device = cuda if torch.cuda.is_available() else 'cpu'
 
     if args.dataset == 'CIFAR10':
+        args.channel = 3
+        args.im_size = (32, 32)
+        #args.num_IN_class = 4
+
+    elif args.dataset == 'SVHN':
         args.channel = 3
         args.im_size = (32, 32)
         #args.num_IN_class = 4

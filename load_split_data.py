@@ -7,10 +7,12 @@ from torch.utils.data.dataset import Subset
 from datasets.cifar10 import MyCIFAR10
 from datasets.cifar100 import MyCIFAR100
 from datasets.imagenet import MyImageNet
+from datasets.svhn import MySVHN
 from torchvision import datasets
 import torchvision.transforms as T
 
 CIFAR10_SUPERCLASS = list(range(10))  # one class
+SVHN_SUPERCLASS = list(range(10))  # one class
 CIFAR100_SUPERCLASS = [
     [4, 31, 55, 72, 95],#1  d
     [1, 33, 67, 73, 91],#2  d
@@ -55,12 +57,14 @@ def get_dataset(args, trial):
         T_normalize = T.Normalize([0.4914, 0.4822, 0.4465], [0.2023, 0.1994, 0.2010])
     elif args.dataset == 'CIFAR100':
         T_normalize = T.Normalize([0.5071, 0.4867, 0.4408], [0.2675, 0.2565, 0.2761])
+    elif args.dataset == 'SVHN':
+        T_normalize = T.Normalize([0.4377, 0.4438, 0.4728], [0.1980, 0.2010, 0.1970])
     elif args.dataset == 'ImageNet50':
         T_normalize = T.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
 
     # Transform
-    if args.dataset in ['CIFAR10', 'CIFAR100']:
-        train_transform = T.Compose([T.RandomHorizontalFlip(), T.RandomCrop(size=32, padding=4), T.ToTensor(), T_normalize])  #
+    if args.dataset in ['CIFAR10', 'CIFAR100', 'SVHN']:
+        train_transform = T.Compose([T.RandomHorizontalFlip(), T.RandomCrop(size=32, padding=4), T.ToTensor(), T_normalize])
         test_transform = T.Compose([T.ToTensor(), T_normalize])
     elif args.dataset == 'ImageNet50':
         train_transform = T.Compose([T.Resize(256), T.RandomCrop(224), T.RandomHorizontalFlip(), T.ToTensor(), T_normalize])
@@ -68,7 +72,6 @@ def get_dataset(args, trial):
 
     # Dataset
     if args.dataset == 'CIFAR10':
-
         file_path = args.data_path + '/cifar10/'
         train_set = MyCIFAR10(file_path, train=True, download=True, transform=train_transform)
         unlabeled_set = MyCIFAR10(file_path, train=True, download=True, transform=test_transform)
@@ -78,6 +81,11 @@ def get_dataset(args, trial):
         train_set = MyCIFAR100(file_path, train=True, download=True, transform=train_transform)
         unlabeled_set = MyCIFAR100(file_path, train=True, download=True, transform=test_transform)
         test_set = MyCIFAR100(file_path, train=False, download=True, transform=test_transform)
+    elif args.dataset == 'SVHN':
+        file_path = args.data_path + '/svhn/'
+        train_set = MySVHN(file_path, split='train', download=True, transform=train_transform)
+        unlabeled_set = MySVHN(file_path, split='train', download=True, transform=test_transform)
+        test_set = MySVHN(file_path, split='test', download=True, transform=test_transform)
     elif args.dataset == 'ImageNet50':
         # Load Preprocessed IN-classes & indices; 50 classes were randomly selected
         index_path = args.data_path + '/ImageNet50/class_indice_dict.pickle'
@@ -94,6 +102,12 @@ def get_dataset(args, trial):
 
     # class-split
     if args.dataset == 'CIFAR10':
+        args.input_size = 32 * 32 * 3
+        args.target_lists = [[4, 2, 5, 7], [7, 1, 2, 5], [6, 4, 3, 2], [8, 9, 1, 3], [2, 9, 5, 3]] # Randomly Selected
+        args.target_list = args.target_lists[trial]
+        args.untarget_list = list(np.setdiff1d(list(range(0, 10)), list(args.target_list)))
+        args.num_IN_class = 4
+    elif args.dataset == 'SVHN':
         args.input_size = 32 * 32 * 3
         args.target_lists = [[4, 2, 5, 7], [7, 1, 2, 5], [6, 4, 3, 2], [8, 9, 1, 3], [2, 9, 5, 3]] # Randomly Selected
         args.target_list = args.target_lists[trial]
@@ -126,7 +140,7 @@ def get_dataset(args, trial):
         args.num_IN_class = 50
 
     # class converting
-    if args.dataset in ['CIFAR10', 'CIFAR100']:
+    if args.dataset in ['CIFAR10', 'CIFAR100', 'SVHN']:
         for i, c in enumerate(args.untarget_list):
             train_set.targets[np.where(train_set.targets == c)[0]] = int(args.n_class)
             test_set.targets[np.where(test_set.targets == c)[0]] = int(args.n_class)
@@ -158,7 +172,7 @@ def get_dataset(args, trial):
 
     # Split Check
     print("Target classes: ", args.target_list)
-    if args.dataset in ['CIFAR10', 'CIFAR100']:
+    if args.dataset in ['CIFAR10', 'CIFAR100', 'SVHN']:
         uni, cnt = np.unique(np.array(unlabeled_set.targets), return_counts=True)
         print("Train, # samples per class")
         print(uni, cnt)
@@ -182,6 +196,8 @@ def get_superclass_list(dataset):
         return CIFAR10_SUPERCLASS
     elif dataset == 'cifar100':
         return CIFAR100_SUPERCLASS
+    elif dataset == 'svhn':
+        return SVHN_SUPERCLASS
     elif dataset == 'imagenet':
         return IMAGENET_SUPERCLASS
     else:
@@ -205,7 +221,7 @@ def get_sub_train_dataset(args, dataset, L_index, O_index, U_index, Q_index, ini
     ood_rate = args.ood_rate
 
     if initial:
-        if args.dataset in ['CIFAR10', 'CIFAR100']:
+        if args.dataset in ['CIFAR10', 'CIFAR100', 'SVHN']:
             L_total = [dataset[i][2] for i in range(len(dataset)) if dataset[i][1] < len(classes)]
             O_total = [dataset[i][2] for i in range(len(dataset)) if dataset[i][1] >= len(classes)]
 
@@ -251,7 +267,7 @@ def get_sub_train_dataset(args, dataset, L_index, O_index, U_index, Q_index, ini
 
 def get_sub_test_dataset(args, dataset):
     classes = args.target_list
-    if args.dataset in ['CIFAR10', 'CIFAR100']:
+    if args.dataset in ['CIFAR10', 'CIFAR100', 'SVHN']:
         labeled_index = [dataset[i][2] for i in range(len(dataset)) if dataset[i][1] < len(classes)]
     elif args.dataset == 'ImageNet50':
         labeled_index = [dataset[i][2] for i in args.in_test_indices]

@@ -154,12 +154,12 @@ class RandomResizedCropLayer(nn.Module):
             h = np.concatenate([h, np.ones(N - cond_len) * height])
 
         w_bias = np.random.randint(w - width, width - w + 1) / width
-        h_bias = np.random.randint(h - height,height - h + 1) / height
+        h_bias = np.random.randint(h - height, height - h + 1) / height
         w = w / width
         h = h / height
 
         whbias = np.column_stack([w, h, w_bias, h_bias])
-        whbias = torch.tensor(whbias, device=_device)
+        whbias = torch.tensor(whbias, device=_device, dtype=inputs.dtype)
 
         return whbias
 

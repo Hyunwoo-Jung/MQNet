@@ -284,7 +284,9 @@ def _get_features(P, model_distinctive,model_semantic, loader, interp=False, ima
                 x_t = torch.cat([P.shift_trans(hflip(x), k) for k in range(P.K_shift)])
             else:
                 x_t = x # No shifting: SimCLR
-            x_t = simclr_aug(x_t)
+            x_cpu = x_t.detach().cpu()
+            x_cpu = simclr_aug(x_cpu)
+            x_t = x_cpu.to(P.device)
 
             # compute augmented features
             with torch.no_grad():

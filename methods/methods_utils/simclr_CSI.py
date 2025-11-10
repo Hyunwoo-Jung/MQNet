@@ -91,7 +91,7 @@ def csi_train_epoch(P, epoch, model, criterion, optimizer, scheduler, loader, si
         losses['sim'].update(loss_sim.item(), batch_size)
         losses['shift'].update(loss_shift.item(), batch_size)
 
-        if epoch%100 == 0 and count % 3000 == 0:
+        if epoch%100 == 0 and count % 200 == 0:
             print('[Epoch %3d; %3d] [Time %.3f] [Data %.3f] [LR %.5f]\n''[LossC %f] [LossSim %f] [LossShift %f]' %
                  (epoch, count, batch_time.value, data_time.value, lr,
                   losses['cls'].value, losses['sim'].value, losses['shift'].value))
