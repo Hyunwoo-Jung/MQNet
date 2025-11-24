@@ -46,17 +46,31 @@ rounds = None
 
 methods_order = ["RANDOM","CONF","Margin","Entropy","CORESET","LL","BADGE","CCAL","MQNet","GOALDE"]
 
+color_palette = plt.get_cmap("tab10").colors
+custom_colors = {
+    "RANDOM":  color_palette[0],
+    "CONF":    color_palette[1],
+    "Margin":  color_palette[2],
+    "Entropy": color_palette[4],
+    "CORESET": color_palette[5],
+    "LL":      color_palette[6],
+    "BADGE":   color_palette[7],
+    "CCAL":    color_palette[8],
+    "MQNet":   color_palette[9],
+    "GOALDE":  color_palette[3],
+}
+
 line_styles = {
     "RANDOM":  {"ls":"--", "marker":"*",  "lw":1.0, "ms":4},
-    "CONF":    {"ls":"-",  "marker":"^",  "lw":1.0, "ms":4},
-    "Margin":  {"ls":"-",  "marker":"s",  "lw":1.0, "ms":4},
-    "Entropy": {"ls":"-",  "marker":"o",  "lw":1.0, "ms":4},
-    "CORESET": {"ls":"-",  "marker":"P",  "lw":1.0, "ms":4},
-    "LL":      {"ls":"--", "marker":"D",  "lw":1.0, "ms":4},
+    "CONF":    {"ls":"--",  "marker":"^",  "lw":1.0, "ms":4},
+    "Margin":  {"ls":"--",  "marker":"s",  "lw":1.0, "ms":4},
+    "Entropy": {"ls":"--",  "marker":"o",  "lw":1.0, "ms":4},
+    "CORESET": {"ls":"-.",  "marker":"P",  "lw":1.0, "ms":4},
+    "LL":      {"ls":"-.", "marker":"D",  "lw":1.0, "ms":4},
     "BADGE":   {"ls":"-.", "marker":"v",  "lw":1.0, "ms":4},
     "CCAL":    {"ls":"-",  "marker":"p",  "lw":1.0, "ms":4},
-    "MQNet":   {"ls":"-",  "marker":"<",  "lw":1.2, "ms":4},
-    "GOALDE":  {"ls":"-",  "marker":"X",  "lw":1.5, "ms":5},
+    "MQNet":   {"ls":"-",  "marker":"<",  "lw":1.0, "ms":4},
+    "GOALDE":  {"ls":"-",  "marker":"X",  "lw":1.0, "ms":4, "zorder":10},
 }
 
 def plot_accuracy_panels(data_dict, methods=methods_order, rounds=None,
@@ -101,7 +115,9 @@ def plot_accuracy_panels(data_dict, methods=methods_order, rounds=None,
                     linestyle=style["ls"],
                     marker=style["marker"],
                     linewidth=style["lw"],
-                    markersize=style["ms"])
+                    markersize=style["ms"],
+                    color=custom_colors[m],
+                    zorder=style.get("zorder", None))
 
         ax.set_title(f"{nz}% Noise")
         ax.set_xlabel("Round")
@@ -121,6 +137,6 @@ def plot_accuracy_panels(data_dict, methods=methods_order, rounds=None,
     fig.savefig("accuracy_panels.png", bbox_inches="tight")
 
 # 노이즈별 y축 범위 예시(원하면 수정)
-y_lims = {20: (70, 100), 40: (70, 100), 50: (70, 100)}
+y_lims = {20: (70, 100), 40: (60, 100), 50: (60, 100)}
 
 plot_accuracy_panels(data, noise_order=(20,40,50), y_lims=y_lims)

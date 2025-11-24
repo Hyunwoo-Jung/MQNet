@@ -2,7 +2,6 @@
 import os
 import time
 import random
-import sys
 
 # Torch
 import torch
@@ -20,8 +19,6 @@ from load_split_data import get_dataset, get_sub_train_dataset, get_sub_test_dat
 import nets
 
 import methods as methods
-
-sys.stdout.reconfigure(line_buffering=True)
 
 # Seed
 random.seed(115)

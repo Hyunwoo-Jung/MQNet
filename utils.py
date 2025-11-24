@@ -377,7 +377,7 @@ def train(args, models, criterion, optimizers, schedulers, dataloaders):
     print("num_epochs: {}, steps_per_epoch: {}, total_update: {}".format(
             args.epochs, args.steps_per_epoch, int(args.epochs*args.steps_per_epoch)) )
 
-    if args.method in ['Random', 'Uncertainty', 'Coreset', 'BADGE', 'CCAL', 'SIMILAR']:
+    if args.method in ['Random', 'Uncertainty', 'Coreset', 'BADGE', 'CCAL', 'SIMILAR', 'GOALDE']:
         for epoch in tqdm(range(args.epochs), leave=False, total=args.epochs):
             train_epoch(args, models, criterion, optimizers, dataloaders)
             schedulers['backbone'].step()
@@ -617,7 +617,7 @@ def get_optim_configurations(args, models):
         scheduler = torch.optim.lr_scheduler.__dict__[args.scheduler](optimizer)
 
     # Normal
-    if args.method in ['Random', 'Uncertainty', 'Coreset', 'BADGE', 'SIMILAR']:
+    if args.method in ['Random', 'Uncertainty', 'Coreset', 'BADGE', 'SIMILAR', 'GOALDE']:
         optimizers = {'backbone': optimizer}
         schedulers = {'backbone': scheduler}
 

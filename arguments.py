@@ -55,7 +55,7 @@ parser.add_argument("--test_fraction", '-tf', type=float, default=1.,
                     help="proportion of test dataset used for evaluating the model (default: 1.)")
 
 # AL Algorithm
-parser.add_argument('--method', default="Coreset", help="specifiy AL method to use") #Random, Uncertainty, Coreset, LL, BADGE, CCAL, SIMILAR, MQNet
+parser.add_argument('--method', default="Coreset", help="specifiy AL method to use") # Random, Uncertainty, Coreset, LL, BADGE, CCAL, SIMILAR, MQNet
 parser.add_argument('--submodular', default="logdetcmi", help="specifiy submodular function to use") #flcmi, logdetcmi
 parser.add_argument('--submodular_greedy', default="LazyGreedy", help="specifiy greedy algorithm for submodular optimization")
 parser.add_argument('--uncertainty', default="CONF", help="specifiy uncertanty score to use") #CONF, Margin, Entropy
